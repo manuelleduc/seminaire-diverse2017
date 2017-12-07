@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
 
-module Domain (User(User),Token(Token)) where
+module Domain (User(User),Token(Token,TokenError)) where
 
 import           Data.Aeson
 import           Data.Aeson.TH
@@ -15,8 +15,11 @@ data User = User
   , pass  :: String
   } deriving (Eq, Show)
 
-newtype Token = Token {
+
+data Token = Token {
   tokenValue :: String
+} | TokenError {
+  fault :: String
 } deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''User)

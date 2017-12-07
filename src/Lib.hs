@@ -1,40 +1,60 @@
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds         #-}
+{-{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE LambdaCase        #-}-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Lib
     ( startApp
     , app
     ) where
 
-import           Data.Aeson
-import           Data.Aeson.TH
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger     (runStderrLoggingT)
+import           Domain                   (Token (..), User (User))
+
+import           Data.String.Conversions
+
+import           Database.Persist
+import           Database.Persist.Sql
+import           Database.Persist.Sqlite
+
 import           Network.Wai
-import           Network.Wai.Handler.Warp
+import           Network.Wai.Handler.Warp as Warp
+
 import           Servant
 
-import           Domain                   (Token(Token), User(User))
+import           Data.Text
+import qualified Db                       as D
 
 
 -- TODO: save tokens as persistent
-type API = "users" :> Get '[JSON] [User]
-  :<|> "login" :> ReqBody '[JSON] User :> Post '[JSON] Token
+type API = "login" :> ReqBody '[JSON] User :> Post '[JSON] Token
 
-startApp :: IO ()
-startApp = run 8080 app
+startApp :: FilePath ->  IO ()
+startApp sqliteFile = run 8080 =<< mkApp sqliteFile
 
-app :: Application
-app = serve api server
+mkApp :: FilePath -> IO Application
+mkApp sqliteFile = do
+  pool <- runStderrLoggingT $ createSqlitePool (cs sqliteFile) 5
+  runSqlPool (runMigration D.migrateAll) pool
+  return $ app pool
+
+app :: ConnectionPool -> Application
+app pool = serve api $ server pool
 
 api :: Proxy API
 api = Proxy
 
-server :: Server API
-server = return users
-  :<|> loginPost
+server :: ConnectionPool -> Server API
+server pool = loginPostH
+  where loginPostH user = liftIO $ loginPost pool user
 
-users :: [User]
-users = [ User "admin" "admin"]
-
-loginPost:: User -> Handler Token
-loginPost (User "admin" "admin") = return $ Token "yolo"
--- Partial function !!!
+loginPost:: ConnectionPool -> User -> IO Token
+loginPost pool (User "admin" "admin") = flip runSqlPersistMPool pool $ do
+      insert token
+      return $ Token (unpack r)
+  where token = D.Token r
+        r = "ok" -- todo random string
+loginPost _ _ = return $ TokenError "invalid login and password"
