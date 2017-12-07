@@ -37,4 +37,4 @@ users = [ User "admin" "admin"]
 
 loginPost:: User -> Handler Token
 loginPost (User "admin" "admin") = return $ Token "yolo"
-loginPost _ = return $ err503 { errBody = "invalid login and password" }
+-- Partial function !!!
