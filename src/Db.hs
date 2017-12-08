@@ -13,6 +13,7 @@ module Db where
 
 import           Data.Aeson
 import           Data.Text
+import           Data.Time.Clock (UTCTime)
 
 import           Database.Persist.TH
 
@@ -20,6 +21,7 @@ import           Database.Persist.TH
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Token
   tokenValue Text
+  timestamp  UTCTime
   deriving Eq Read Show
 |]
 
@@ -27,8 +29,12 @@ Token
 instance FromJSON Token where
   parseJSON = withObject "Token" $ \ v ->
     Token <$> v .: "tokenValue"
+          <*> v .: "timestamp"
 
 
 instance ToJSON Token where
-  toJSON (Token tokenValue) =
-    object [ "tokenValue" .= tokenValue ]
+  toJSON (Token tokenValue timestamp) =
+    object [
+      "tokenValue" .= tokenValue
+    , "timestamp" .= timestamp
+    ]

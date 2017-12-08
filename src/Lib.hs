@@ -28,6 +28,10 @@ import           Servant
 import           Data.Text
 import qualified Db                       as D
 
+import           Data.Time.Clock          (getCurrentTime)
+
+import           Text.StringRandom        (stringRandomIO)
+
 
 -- TODO: save tokens as persistent
 type API = "login" :> ReqBody '[JSON] User :> Post '[JSON] Token
@@ -53,8 +57,8 @@ server pool = loginPostH
 
 loginPost:: ConnectionPool -> User -> IO Token
 loginPost pool (User "admin" "admin") = flip runSqlPersistMPool pool $ do
-      insert token
+      t <- liftIO getCurrentTime
+      r <- liftIO $ stringRandomIO "[a-zA-Z0-9]{50}"
+      insert (D.Token r t)
       return $ Token (unpack r)
-  where token = D.Token r
-        r = "ok" -- todo random string
 loginPost _ _ = return $ TokenError "invalid login and password"
