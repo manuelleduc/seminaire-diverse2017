@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 
 module Lib
@@ -14,7 +15,7 @@ module Lib
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger     (runStderrLoggingT)
-import           Domain                   (User (User), AuthError(AuthError)) --Token (..),
+import           Domain                   (User (User), AuthError(AuthError),Expression(Expression), Result(Result))
 
 import           Data.String.Conversions
 
@@ -40,7 +41,8 @@ import qualified Data.ByteString.Lazy.Char8 as BS (pack)
 
 import Control.Monad ((<=<))
 
-type API = "login" :> ReqBody '[JSON] User :> Post '[JSON] D.Token
+type API = {-"login" :> ReqBody '[JSON] User :> Post '[JSON] D.Token
+  :<|>-} "compute" :> ReqBody '[JSON]' Expression :> Post '[JSON] Result
 
 startApp :: FilePath ->  IO ()
 startApp sqliteFile = run 8080 =<< mkApp sqliteFile
@@ -58,17 +60,18 @@ api :: Proxy API
 api = Proxy
 
 server :: ConnectionPool -> Server API
-server pool =  loginPostH
+server pool =  {-loginPostH :<|>-} computePostH
   where
-    loginPostH = withError <=< liftIO . loginPost pool
-
-{-}  do a <- withError <=< loginPostH
-                 return a
-  where loginPostH u = loginPost pool u-}
+    --loginPostH = withError <=< liftIO . loginPost pool
+    computePostH = withError <=< (liftIO . computePost pool)
 
 withError :: MonadError ServantErr m => Either AuthError a -> m a
 withError (Right a) = return a
 withError (Left (AuthError t)) = throwError $ err401 { errBody = BS.pack t }
+
+computePost:: ConnectionPool -> Expression -> IO (Either AuthError Result)
+computePost pool _ = flip runSqlPersistMPool pool $ do
+  return $ Right (Result 1.0)
 
 loginPost:: ConnectionPool -> User -> IO (Either AuthError D.Token)
 loginPost pool (User "admin" "admin") = flip runSqlPersistMPool pool $ do
