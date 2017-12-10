@@ -14,9 +14,7 @@ import           Control.Monad.Trans
 import           Data.Aeson                hiding (json)
 import           Data.Complex
 import           Data.IORef
-import           Data.Map
 import           Data.Monoid
-import           Data.Scientific           (Scientific, toRealFloat)
 import           Data.Text                 (pack)
 import qualified Data.Text                 as T
 import           Data.Time.Clock           (getCurrentTime)
@@ -26,10 +24,10 @@ import           Db                        (createToken, findToken, migrateAll,
                                             removeOldTokens, runSQL)
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
-import           Text.Parsec.Expr.Math
 import           Text.StringRandom         (stringRandomIO)
 import           Web.Spock
 import           Web.Spock.Config
+import Eval (eval)
 
 start :: Config -> IO ()
 start config@(Config db port) =
@@ -78,13 +76,10 @@ app =
          runSQL $ removeOldTokens currentTime -- cleanup old tokens
          tokenLine <- runSQL $ findToken (pack token)
          case tokenLine of
-           Just _  -> case parse expression of
-             Left _ -> do setStatus status418
-                          json $ object ["fault" .= String (pack $ "can't parse the expression " ++  expression)]
-             Right e -> case evaluate (fromList []) . Just $ e of
-               Just a -> json $ object ["result" .= String (pack . show $ a)] -- todo print a Number if it can be represented as such, and same thing with booleans
-               Nothing -> do setStatus status418
-                             json $ object ["fault" .= String (pack $ "can't parse the expression 2 " ++ expression)]
-
+           Just _  -> do
+            v <- liftIO $ eval expression
+            case v of
+              Left _ -> json $ object ["fault" .= String "TODO"]
+              Right a -> json $ object ["fault" .= String "TODO"]
            Nothing -> do setStatus status401
                          json $ object ["fault" .= String "invalid token"]
