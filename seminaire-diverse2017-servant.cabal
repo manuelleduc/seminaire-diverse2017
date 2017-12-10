@@ -15,7 +15,9 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib,  Db
+  exposed-modules:     Lib
+                     , Db
+                     , Config
   build-depends: base >= 4.7 && < 5
                      , Spock >= 0.11
                      , mtl
@@ -24,7 +26,11 @@ library
                      , http-types
                      , string-random == 0.1.0.0
                      , time
+                     , persistent
                      , persistent-template
+                     , persistent-sqlite
+                     , configurator
+                     , monad-logger
   default-language:    Haskell2010
 
 executable seminaire-diverse2017-servant-exe

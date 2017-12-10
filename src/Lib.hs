@@ -1,28 +1,36 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 module Lib where
 
-
+import           Config
 import           Control.Monad.IO.Class    (liftIO)
-
-import           Web.Spock
-import           Web.Spock.Config
-
+import           Control.Monad.Logger      (runNoLoggingT)
 import           Control.Monad.Trans
 import           Data.Aeson                hiding (json)
 import           Data.IORef
 import           Data.Monoid
 import qualified Data.Text                 as T
-import           GHC.Generics
-import           Text.StringRandom         (stringRandomIO)
-
+import           Database.Persist.Sqlite   (createSqlitePool, runMigration,
+                                            runSqlPool)
+import           Db                        (migrateAll)
+import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
+import           Text.StringRandom         (stringRandomIO)
+import           Web.Spock
+import           Web.Spock.Config
 
-start :: IO ()
-start =
-    do ref <- newIORef 0
+start :: Config -> IO ()
+start (Config db port) =
+    do pool <- runNoLoggingT $ createSqlitePool db 5
+       runNoLoggingT $ runSqlPool (runMigration migrateAll) pool
+       ref <- newIORef 0
        spockCfg <- defaultSpockCfg () PCNoDatabase (DummyAppState ref)
-       runSpock 8080 (spock spockCfg app)
+       runSpock port (spock spockCfg app)
 
 type MySession = ()
 newtype MyAppState = DummyAppState (IORef Int)
@@ -33,7 +41,7 @@ data User = User {
 } deriving (Generic, Show)
 
 data ComputeData = ComputeData  {
-  token :: String,
+  token      :: String,
   expression :: String
 } deriving (Generic, Show)
 
