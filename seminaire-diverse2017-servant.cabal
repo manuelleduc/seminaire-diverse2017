@@ -15,22 +15,16 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib, Domain, Db
-  build-depends:       base >= 4.7 && < 5
-                     , aeson
-                     , servant-server
-                     , wai
-                     , warp
-                     , persistent
-                     , persistent-template
-                     , persistent-sqlite
-                     , text
-                     , monad-logger
-                     , string-conversions
-                     , time
-                     , string-random == 0.1.0.0
+  exposed-modules:     Lib,  Db
+  build-depends: base >= 4.7 && < 5
+                     , Spock >= 0.11
                      , mtl
-                     , bytestring
+                     , text
+                     , aeson
+                     , http-types
+                     , string-random == 0.1.0.0
+                     , time
+                     , persistent-template
   default-language:    Haskell2010
 
 executable seminaire-diverse2017-servant-exe

@@ -1,83 +1,61 @@
-{-# LANGUAGE DataKinds         #-}
-{-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+module Lib where
 
 
-module Lib
-    ( startApp
-    , app
-    ) where
+import           Control.Monad.IO.Class    (liftIO)
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger     (runStderrLoggingT)
-import           Domain                   (User (User), AuthError(AuthError),Expression(Expression), Result(Result))
+import           Web.Spock
+import           Web.Spock.Config
 
-import           Data.String.Conversions
+import           Control.Monad.Trans
+import           Data.Aeson                hiding (json)
+import           Data.IORef
+import           Data.Monoid
+import qualified Data.Text                 as T
+import           GHC.Generics
+import           Text.StringRandom         (stringRandomIO)
 
-import           Database.Persist
-import           Database.Persist.Sql
-import           Database.Persist.Sqlite
+import           Network.HTTP.Types.Status
 
-import           Network.Wai
-import           Network.Wai.Handler.Warp as Warp
+start :: IO ()
+start =
+    do ref <- newIORef 0
+       spockCfg <- defaultSpockCfg () PCNoDatabase (DummyAppState ref)
+       runSpock 8080 (spock spockCfg app)
 
-import           Servant
+type MySession = ()
+newtype MyAppState = DummyAppState (IORef Int)
 
-import           Data.Text
-import qualified Db                       as D
+data User = User {
+  login:: String,
+  pass  :: String
+} deriving (Generic, Show)
 
-import           Data.Time.Clock          (getCurrentTime)
+data ComputeData = ComputeData  {
+  token :: String,
+  expression :: String
+} deriving (Generic, Show)
 
-import           Text.StringRandom        (stringRandomIO)
+instance ToJSON User
+instance FromJSON User
 
-import Control.Monad.Error.Class (MonadError)
+instance ToJSON ComputeData
+instance FromJSON ComputeData
 
-import qualified Data.ByteString.Lazy.Char8 as BS (pack)
+type ApiAction a = SpockAction  () MySession MyAppState a
 
-import Control.Monad ((<=<))
 
-type API = {-"login" :> ReqBody '[JSON] User :> Post '[JSON] D.Token
-  :<|>-} "compute" :> ReqBody '[JSON]' Expression :> Post '[JSON] Result
-
-startApp :: FilePath ->  IO ()
-startApp sqliteFile = run 8080 =<< mkApp sqliteFile
-
-mkApp :: FilePath -> IO Application
-mkApp sqliteFile = do
-  pool <- runStderrLoggingT $ createSqlitePool (cs sqliteFile) 5
-  runSqlPool (runMigration D.migrateAll) pool
-  return $ app pool
-
-app :: ConnectionPool -> Application
-app pool = serve api $ server pool
-
-api :: Proxy API
-api = Proxy
-
-server :: ConnectionPool -> Server API
-server pool =  {-loginPostH :<|>-} computePostH
-  where
-    --loginPostH = withError <=< liftIO . loginPost pool
-    computePostH = withError <=< (liftIO . computePost pool)
-
-withError :: MonadError ServantErr m => Either AuthError a -> m a
-withError (Right a) = return a
-withError (Left (AuthError t)) = throwError $ err401 { errBody = BS.pack t }
-
-computePost:: ConnectionPool -> Expression -> IO (Either AuthError Result)
-computePost pool _ = flip runSqlPersistMPool pool $ do
-  return $ Right (Result 1.0)
-
-loginPost:: ConnectionPool -> User -> IO (Either AuthError D.Token)
-loginPost pool (User "admin" "admin") = flip runSqlPersistMPool pool $ do
-      t <- liftIO getCurrentTime
-      r <- liftIO $ stringRandomIO "[a-zA-Z0-9]{50}"
-      let token = D.Token r t
-      insert token
-      return $ Right token
-loginPost _ _ = return $ Left (AuthError "invalid login and password") -- $ err401 undefined --return $ TokenError "invalid login and password"
+app :: SpockM () MySession MyAppState ()
+app =
+    do post "login" $ do
+         usr <- jsonBody' :: ApiAction User
+         case usr of
+           User "admin" "admin" -> do
+             token <- liftIO $ stringRandomIO "[a-zA-Z0-9]{50}"
+             json $ object ["token" .= String token]
+           _ -> do setStatus status401
+                   json $ object ["fault" .= String "invalid login and password"]
+       post "compute" $ do
+         rq <- jsonBody' :: ApiAction ComputeData
+         json $ object  ["result" .= Number 4.2]

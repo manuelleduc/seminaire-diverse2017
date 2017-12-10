@@ -24,3 +24,5 @@ executable seminaire-diverse2017-spock
                      , aeson
                      , http-types
                      , string-random == 0.1.0.0
+                     , time
+                     , persistent-template
