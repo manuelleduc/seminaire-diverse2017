@@ -3,5 +3,6 @@ extra-package-dbs: []
 packages:
 - .
 extra-deps:
+- ParserFunction-0.1.0
 - string-random-0.1.0.0
 resolver: lts-9.17

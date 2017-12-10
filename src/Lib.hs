@@ -12,7 +12,9 @@ import           Control.Monad.IO.Class    (liftIO)
 import           Control.Monad.Logger      (runNoLoggingT)
 import           Control.Monad.Trans
 import           Data.Aeson                hiding (json)
+import           Data.Complex
 import           Data.IORef
+import           Data.Map
 import           Data.Monoid
 import           Data.Text                 (pack)
 import qualified Data.Text                 as T
@@ -23,6 +25,7 @@ import           Db                        (createToken, findToken, migrateAll,
                                             removeOldTokens, runSQL)
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
+import           Text.Parsec.Expr.Math
 import           Text.StringRandom         (stringRandomIO)
 import           Web.Spock
 import           Web.Spock.Config
@@ -74,5 +77,13 @@ app =
          runSQL $ removeOldTokens currentTime -- cleanup old tokens
          tokenLine <- runSQL $ findToken (pack token)
          case tokenLine of
-           Just _  -> json $ object  ["result" .= Number 4.2]
-           Nothing -> json $ object  ["result" .= Number (-4.2)]
+           Just _  -> case parse expression of
+             Left _ -> do setStatus status418
+                          json $ object ["fault" .= String (pack $ "can't parse the expression " ++  expression)]
+             Right e -> case evaluate (fromList []) . Just $ e of
+               Just a -> json $ object ["fault" .= Number a]
+               Nothing -> do setStatus status418
+                             json $ object ["fault" .= String (pack $ "can't parse the expression 2 " ++ expression)]
+
+           Nothing -> do setStatus status401
+                         json $ object ["fault" .= String "invalid token"]

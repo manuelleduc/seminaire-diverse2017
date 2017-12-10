@@ -32,6 +32,8 @@ library
                      , configurator
                      , monad-logger
                      , resourcet
+                     , ParserFunction
+                     , containers
   default-language:    Haskell2010
 
 executable seminaire-diverse2017-servant-exe
