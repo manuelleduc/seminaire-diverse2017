@@ -14,11 +14,13 @@ import           Control.Monad.Trans
 import           Data.Aeson                hiding (json)
 import           Data.IORef
 import           Data.Monoid
+import           Data.Text                 (pack)
 import qualified Data.Text                 as T
 import           Data.Time.Clock           (getCurrentTime)
 import           Database.Persist.Sqlite   (SqlBackend, createSqlitePool,
                                             runMigration, runSqlPool)
-import           Db                        (migrateAll, createToken, runSQL)
+import           Db                        (createToken, findToken, migrateAll,
+                                            removeOldTokens, runSQL)
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
 import           Text.StringRandom         (stringRandomIO)
@@ -67,5 +69,10 @@ app =
            _ -> do setStatus status401
                    json $ object ["fault" .= String "invalid login and password"]
        post "compute" $ do
-         rq <- jsonBody' :: ApiAction () ComputeData
-         json $ object  ["result" .= Number 4.2]
+         (ComputeData token expression) <- jsonBody' :: ApiAction () ComputeData
+         currentTime <- liftIO getCurrentTime
+         runSQL $ removeOldTokens currentTime -- cleanup old tokens
+         tokenLine <- runSQL $ findToken (pack token)
+         case tokenLine of
+           Just _  -> json $ object  ["result" .= Number 4.2]
+           Nothing -> json $ object  ["result" .= Number (-4.2)]

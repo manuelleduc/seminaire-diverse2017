@@ -11,15 +11,22 @@
 
 module Db where
 
+import           Control.Monad.IO.Class       (MonadIO)
 import           Control.Monad.Logger
+import           Control.Monad.Reader         (ReaderT)
 import           Control.Monad.Trans.Resource
 import           Data.Aeson
 import           Data.Text
-import           Data.Time.Clock              (UTCTime)
+import           Data.Time.Clock              (UTCTime, addUTCTime)
+import           Database.Persist             ((<.), (==.))
+import           Database.Persist.Class       (BaseBackend, PersistQueryRead,
+                                               PersistQueryWrite,
+                                               PersistRecordBackend)
 import           Database.Persist.Sql         (SqlPersistT, runSqlConn)
-import           Database.Persist.Sqlite      (SqlBackend, SqlPersistM, insert)
---import           Database.Persist.Sqlite
+import           Database.Persist.Sqlite      (SqlBackend, SqlPersistM,
+                                               deleteWhere, insert, selectFirst)
 import           Database.Persist.TH
+import           Database.Persist.Types       (Entity, SelectOpt)
 import           Web.Spock
 
 -- TODO: expiration time
@@ -46,6 +53,12 @@ instance ToJSON Token where
 
 createToken :: Text -> UTCTime -> SqlPersistM TokenId
 createToken token currentTime = insert (Token token currentTime)
+
+removeOldTokens :: (BaseBackend backend ~ SqlBackend, MonadIO m, PersistQueryWrite backend) => UTCTime -> ReaderT backend m ()
+removeOldTokens currentTime = deleteWhere [TokenTimestamp <. addUTCTime (-900000) currentTime]
+
+findToken :: (BaseBackend backend ~ SqlBackend, PersistQueryRead backend, MonadIO m) => Text -> ReaderT backend m (Maybe (Entity Token))
+findToken token = selectFirst [TokenTokenValue ==. token] []
 
 runSQL :: (HasSpock m, SpockConn m ~ SqlBackend) => SqlPersistT (NoLoggingT (ResourceT IO)) a -> m a
 runSQL action =
