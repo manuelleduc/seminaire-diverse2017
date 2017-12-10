@@ -11,11 +11,16 @@
 
 module Db where
 
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Resource
 import           Data.Aeson
 import           Data.Text
-import           Data.Time.Clock (UTCTime)
-
+import           Data.Time.Clock              (UTCTime)
+import           Database.Persist.Sql         (SqlPersistT, runSqlConn)
+import           Database.Persist.Sqlite      (SqlBackend, SqlPersistM, insert)
+--import           Database.Persist.Sqlite
 import           Database.Persist.TH
+import           Web.Spock
 
 -- TODO: expiration time
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
@@ -38,3 +43,12 @@ instance ToJSON Token where
       "tokenValue" .= tokenValue
     , "timestamp" .= timestamp
     ]
+
+createToken :: Text -> UTCTime -> SqlPersistM TokenId
+createToken token currentTime = insert (Token token currentTime)
+
+runSQL :: (HasSpock m, SpockConn m ~ SqlBackend) => SqlPersistT (NoLoggingT (ResourceT IO)) a -> m a
+runSQL action =
+    runQuery $ \conn ->
+        runResourceT $ runNoLoggingT $ runSqlConn action conn
+{-# INLINE runSQL #-}

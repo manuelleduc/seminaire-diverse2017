@@ -15,9 +15,10 @@ import           Data.Aeson                hiding (json)
 import           Data.IORef
 import           Data.Monoid
 import qualified Data.Text                 as T
-import           Database.Persist.Sqlite   (createSqlitePool, runMigration,
-                                            runSqlPool)
-import           Db                        (migrateAll)
+import           Data.Time.Clock           (getCurrentTime)
+import           Database.Persist.Sqlite   (SqlBackend, createSqlitePool,
+                                            runMigration, runSqlPool)
+import           Db                        (migrateAll, createToken, runSQL)
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
 import           Text.StringRandom         (stringRandomIO)
@@ -25,15 +26,14 @@ import           Web.Spock
 import           Web.Spock.Config
 
 start :: Config -> IO ()
-start (Config db port) =
+start config@(Config db port) =
     do pool <- runNoLoggingT $ createSqlitePool db 5
        runNoLoggingT $ runSqlPool (runMigration migrateAll) pool
-       ref <- newIORef 0
-       spockCfg <- defaultSpockCfg () PCNoDatabase (DummyAppState ref)
+       spockCfg <- defaultSpockCfg () (PCPool pool) (DummyAppState config)
        runSpock port (spock spockCfg app)
 
 type MySession = ()
-newtype MyAppState = DummyAppState (IORef Int)
+newtype MyAppState = DummyAppState Config
 
 data User = User {
   login:: String,
@@ -51,19 +51,21 @@ instance FromJSON User
 instance ToJSON ComputeData
 instance FromJSON ComputeData
 
-type ApiAction a = SpockAction  () MySession MyAppState a
+type ApiAction ctx a = SpockActionCtx  ctx SqlBackend MySession MyAppState a
+type ApiApp ctx = SpockCtxM ctx SqlBackend MySession MyAppState ()
 
-
-app :: SpockM () MySession MyAppState ()
+app :: ApiApp ()
 app =
     do post "login" $ do
-         usr <- jsonBody' :: ApiAction User
+         usr <- jsonBody' :: ApiAction () User
          case usr of
            User "admin" "admin" -> do
+             currentTime <- liftIO getCurrentTime
              token <- liftIO $ stringRandomIO "[a-zA-Z0-9]{50}"
+             runSQL $ createToken token currentTime
              json $ object ["token" .= String token]
            _ -> do setStatus status401
                    json $ object ["fault" .= String "invalid login and password"]
        post "compute" $ do
-         rq <- jsonBody' :: ApiAction ComputeData
+         rq <- jsonBody' :: ApiAction () ComputeData
          json $ object  ["result" .= Number 4.2]
