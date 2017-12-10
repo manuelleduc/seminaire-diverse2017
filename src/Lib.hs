@@ -16,6 +16,7 @@ import           Data.Complex
 import           Data.IORef
 import           Data.Map
 import           Data.Monoid
+import           Data.Scientific           (Scientific, toRealFloat)
 import           Data.Text                 (pack)
 import qualified Data.Text                 as T
 import           Data.Time.Clock           (getCurrentTime)
@@ -81,7 +82,7 @@ app =
              Left _ -> do setStatus status418
                           json $ object ["fault" .= String (pack $ "can't parse the expression " ++  expression)]
              Right e -> case evaluate (fromList []) . Just $ e of
-               Just a -> json $ object ["fault" .= Number a]
+               Just a -> json $ object ["result" .= String (pack . show $ a)] -- todo print a Number if it can be represented as such, and same thing with booleans
                Nothing -> do setStatus status418
                              json $ object ["fault" .= String (pack $ "can't parse the expression 2 " ++ expression)]
 

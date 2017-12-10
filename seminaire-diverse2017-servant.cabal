@@ -34,6 +34,7 @@ library
                      , resourcet
                      , ParserFunction
                      , containers
+                     , scientific
   default-language:    Haskell2010
 
 executable seminaire-diverse2017-servant-exe
