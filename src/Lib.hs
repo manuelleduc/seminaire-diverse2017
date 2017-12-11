@@ -22,12 +22,13 @@ import           Database.Persist.Sqlite   (SqlBackend, createSqlitePool,
                                             runMigration, runSqlPool)
 import           Db                        (createToken, findToken, migrateAll,
                                             removeOldTokens, runSQL)
+import           Eval                      (eval)
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Types.Status
+import           Text.Read                 (readMaybe)
 import           Text.StringRandom         (stringRandomIO)
 import           Web.Spock
 import           Web.Spock.Config
-import Eval (eval)
 
 start :: Config -> IO ()
 start config@(Config db port) =
@@ -77,9 +78,16 @@ app =
          tokenLine <- runSQL $ findToken (pack token)
          case tokenLine of
            Just _  -> do
-            v <- liftIO $ eval expression
-            case v of
-              Left _ -> json $ object ["fault" .= String "TODO"]
-              Right a -> json $ object ["fault" .= String "TODO"]
+             v <- liftIO $ eval expression
+             case v of
+               Left _ -> do setStatus status418
+                            json $ object ["fault" .= String ( pack $ "can't parse expression [" ++ expression ++ "]")]
+               Right a -> case a of
+                 "True" -> json $ object ["result" .= Bool True]
+                 "False" -> json $ object ["result" .= Bool False]
+                 _ -> case readMaybe a of
+                   Nothing -> do setStatus status418
+                                 json $ object ["fault" .= String ( pack $ "can't parse expression [" ++ expression ++ "]")]
+                   Just nv -> json $ object ["result" .= Number nv]
            Nothing -> do setStatus status401
                          json $ object ["fault" .= String "invalid token"]
