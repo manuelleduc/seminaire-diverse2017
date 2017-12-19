@@ -34,11 +34,11 @@ start :: Config -> IO ()
 start config@(Config db port) =
     do pool <- runNoLoggingT $ createSqlitePool db 5
        runNoLoggingT $ runSqlPool (runMigration migrateAll) pool
-       spockCfg <- defaultSpockCfg () (PCPool pool) (DummyAppState config)
+       spockCfg <- defaultSpockCfg () (PCPool pool) config
        runSpock port (spock spockCfg app)
 
 type MySession = ()
-newtype MyAppState = DummyAppState Config
+type MyAppState = Config
 
 data User = User {
   login:: String,

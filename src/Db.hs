@@ -55,7 +55,7 @@ createToken :: Text -> UTCTime -> SqlPersistM TokenId
 createToken token currentTime = insert (Token token currentTime)
 
 removeOldTokens :: (BaseBackend backend ~ SqlBackend, MonadIO m, PersistQueryWrite backend) => UTCTime -> ReaderT backend m ()
-removeOldTokens currentTime = deleteWhere [TokenTimestamp <. addUTCTime (-900000) currentTime]
+removeOldTokens currentTime = deleteWhere [TokenTimestamp <. addUTCTime (-15 * 60 * 1000) currentTime]
 
 findToken :: (BaseBackend backend ~ SqlBackend, PersistQueryRead backend, MonadIO m) => Text -> ReaderT backend m (Maybe (Entity Token))
 findToken token = selectFirst [TokenTokenValue ==. token] []

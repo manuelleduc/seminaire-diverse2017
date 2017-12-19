@@ -40,7 +40,7 @@ library
 executable seminaire-diverse2017-servant-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -optl-static -fPIC -Os
   build-depends:       base
                      , seminaire-diverse2017-servant
   default-language:    Haskell2010
