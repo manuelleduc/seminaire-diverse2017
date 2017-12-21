@@ -1,5 +1,3 @@
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -7,7 +5,6 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-
 
 module Db where
 
@@ -29,7 +26,6 @@ import           Database.Persist.TH
 import           Database.Persist.Types       (Entity, SelectOpt)
 import           Web.Spock
 
--- TODO: expiration time
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Token
   tokenValue Text

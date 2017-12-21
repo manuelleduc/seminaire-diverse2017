@@ -29,6 +29,7 @@ import           Text.Read                 (readMaybe)
 import           Text.StringRandom         (stringRandomIO)
 import           Web.Spock
 import           Web.Spock.Config
+import Services
 
 start :: Config -> IO ()
 start config@(Config db port) =
@@ -37,57 +38,8 @@ start config@(Config db port) =
        spockCfg <- defaultSpockCfg () (PCPool pool) config
        runSpock port (spock spockCfg app)
 
-type MySession = ()
-type MyAppState = Config
-
-data User = User {
-  login:: String,
-  pass  :: String
-} deriving (Generic, Show)
-
-data ComputeData = ComputeData  {
-  token      :: String,
-  expression :: String
-} deriving (Generic, Show)
-
-instance ToJSON User
-instance FromJSON User
-
-instance ToJSON ComputeData
-instance FromJSON ComputeData
-
-type ApiAction ctx a = SpockActionCtx  ctx SqlBackend MySession MyAppState a
-type ApiApp ctx = SpockCtxM ctx SqlBackend MySession MyAppState ()
 
 app :: ApiApp ()
 app =
-    do post "login" $ do
-         usr <- jsonBody' :: ApiAction () User
-         case usr of
-           User "admin" "admin" -> do
-             currentTime <- liftIO getCurrentTime
-             token <- liftIO $ stringRandomIO "[a-zA-Z0-9]{50}"
-             runSQL $ createToken token currentTime
-             json $ object ["token" .= String token]
-           _ -> do setStatus status401
-                   json $ object ["fault" .= String "invalid login and password"]
-       post "compute" $ do
-         (ComputeData token expression) <- jsonBody' :: ApiAction () ComputeData
-         currentTime <- liftIO getCurrentTime
-         runSQL $ removeOldTokens currentTime -- cleanup old tokens
-         tokenLine <- runSQL $ findToken (pack token)
-         case tokenLine of
-           Just _  -> do
-             v <- liftIO $ eval expression
-             case v of
-               Left _ -> do setStatus status418
-                            json $ object ["fault" .= String ( pack $ "can't parse expression [" ++ expression ++ "]")]
-               Right a -> case a of
-                 "True" -> json $ object ["result" .= Bool True]
-                 "False" -> json $ object ["result" .= Bool False]
-                 _ -> case readMaybe a of
-                   Nothing -> do setStatus status418
-                                 json $ object ["fault" .= String ( pack $ "can't parse expression [" ++ expression ++ "]")]
-                   Just nv -> json $ object ["result" .= Number nv]
-           Nothing -> do setStatus status401
-                         json $ object ["fault" .= String "invalid token"]
+    do post "login" postLogin
+       post "compute" postCompute
